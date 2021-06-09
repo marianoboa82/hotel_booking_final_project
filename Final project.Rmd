@@ -552,9 +552,13 @@ The ROC curve shows that our model has a 71.3% of accuracy for predicting the fu
 
 Based on the analysis we can recommend to both hotels to focus their advertisement on previous guests, as well offering special accommodations, and adjustable packages to serve the needs of the clients. Since being a repeated guest and special request increase the odds of fulfillment of the reservation.
 
-##**Recommendations**
+##**Limitations**
 
-The hotel booking has many other interesting variables, and they could also be consider to build another model
+The hotel booking has many other informative variables, and they could also be used to build a more accurate model.
+ADR variable, the average daily rate, could have been useful to add to the model, or to define other research questions
+
+
+
 
 
 
