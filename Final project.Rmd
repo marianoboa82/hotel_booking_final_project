@@ -525,8 +525,6 @@ print(error_r)
 ```{r }
 # Required packages
 library(pROC)
-library(performance)
-
 
 # Margin smaller
 par(pty = "s")
@@ -545,14 +543,15 @@ The ROC curve shows that our model has a 71.3% of accuracy for predicting the fu
 ## **Conclusions**
 
 * Based on the analysis we can recommend to both hotels to focus their advertisement on previous guests, as well offering special accommodations, and adjustable packages to serve the needs of the clients. Since being a repeated guest and special request increase the odds of fulfillment of the reservation. 
-* Hotels can reward client fidelity, when several reservations have been fulfilled, and in this way increasing the chances of clients coming back.
+* Hotels can reward client fidelity, when several reservations have been fulfilled, and in this way increasing the chances of clients coming back and avoiding several cancellations.
+* When children are companions there is a decrease in the odds of fulfillment, this could be caused by multiple factors, children get sick, they need special installations,etc. The hotels can target single people, couples without children, retired people, if they want to increase their chances of fulfillment. 
 
 
 ## **Limitations**
 
-* There are some serious limitations in the preset analysis. First, lead time and deposit type did not have a clear contribution to predicting the odds of fulfillment of the reservation
+* There are some serious limitations in the present analysis. First, lead time and deposit type did not have a clear contribution to predicting the odds of fulfillment of the reservation. Further data manipulation with these variables could have been useful.
 * The hotel booking has many other informative variables, and they could also be used to build a more accurate model.
-ADR variable, the average daily rate, could have been useful to add to the model, or to define other research questions
+ADR variable, the average daily rate, could have been useful to add to the model, or to define other interesting research questions.
 
 
 
