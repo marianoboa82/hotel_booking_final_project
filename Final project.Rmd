@@ -8,9 +8,11 @@ editor_options:
   number_sections: TRUE
 ---
 
-```{r, warning = FALSE, message = FALSE}
+```{r, setup, include=FALSE}
 chooseCRANmirror(graphics=FALSE, ind=1)
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
 
 # Required packages
 
@@ -28,15 +30,15 @@ library(sjPlot)
 
 ```
 
-#**Hotel booking dataset** 
+# **Hotel booking dataset** 
 
 The dataset we are going to analyze is "Hotel Booking". This dataset contains hotel booking information from two hotels in Portugal. 
 Research problem: Canceled reservations or no shows are a waste of resources for the hotels. The aim is to predict the fulfillment of the booked reservation in order to provide recommendations to the hotels to have higher changes of fulfillment of the reservation. 
 
-##**Exploratory Data Analysis**
+## **Exploratory Data Analysis**
 
 First, we will explore what type of information is available.
-```{r}
+```{r }
 # Import dataset
 booking <- tt_load("2020-02-11")
 
@@ -60,7 +62,7 @@ hotel_book_fac <- hotel_booking %>%
 view(hotel_book_fac)
 ```
 
-###**Data visualization**
+### **Data visualization**
 
 Where are the clients from? 
 Clients from which country are more likely to cancel or check out?
@@ -113,7 +115,7 @@ ggplot(hotel_book_fac, aes(x = country_cont, fill = reservation_status)) +
 
 Based on the plot we can see that city hotel has more reservations but also more cancellations, as well most of the clients for both hotels come from Europe
 
-###**Special requests**
+### **Special requests**
 
 We would like to visualize how special requests relate to reservation status in the different hotels
 
@@ -139,7 +141,7 @@ ggplot(special_requests, aes(x = reservation_status, y= spec_re_sum, fill = hote
 ```
 Based on the plot we can visualize that when there are special requests clients are more likely to check out, however a great number of special requests were made and the reservation was still cancelled. Most of the reservations and cancellations are done in City Hotel.
 
-###**Total of check-out clients**
+### **Total of check-out clients**
 
 The dataset contains reservations that were cancelled and clients who did not show up. We want to visualize the total number of clients (adult, children and babies) that checkout in each hotel.
 
@@ -162,7 +164,7 @@ print(hotel_booking2)
 ```
 Based on the graph we can visualize that City hotel had more clients every year than Resort Hotel
 
-###**Reservation status**
+### **Reservation status**
 
 We want to visualize how different variables relate to reservations status
 
@@ -199,7 +201,7 @@ ggplot(hotel_book_fac, aes(x = deposit_type, fill = reservation_status)) +
 # Based on the plot most of the cancellations and no shows occur when there is not deposit in both hotels
 ```
 
-##**Further data manipulation**
+## **Further data manipulation**
 
 In the dataset, number of children and infants are separated from adults. We would like to summarize this information in a logical variable that identifies whether the reservation included children/ babies or not. As well, we want to group the month variable by season, since there are months where is expected a lower number of reservations. 
 
@@ -219,7 +221,7 @@ hotel_b_m <- hotel_book_fac %>%
   mutate(season = fct_relevel(season, 
                               levels = "Spring", "Summer", "Fall", "Winter"))
 
-sum(is.na(hotel_b_m2$child_comp))
+sum(is.na(hotel_b_m$child_comp))
 
 # Create a more specific variable that indicates whether the reservation was fulfilled or not. 
 
@@ -288,7 +290,7 @@ After the EDA we select the variables that might be good predictors of the likel
 ```{r }
 # Select variables
 hotel_m <- hotel_b_m2 %>%
-  select(hotel,lead_time, is_repeated_guest, previous_cancellations, deposit_type, total_of_special_requests, child_comp, season, fulfillment)
+  select(hotel, lead_time, is_repeated_guest, previous_cancellations, deposit_type, total_of_special_requests, child_comp, season, fulfillment)
 
 head(hotel_m)
 
@@ -312,7 +314,7 @@ view(resort_hotel)
 
 ```
 
-##**Building the model**
+## **Building the model**
 
 We want to predict the fulfillment or not fulfillment of the reservations. The outcome is binomial categorical variable "Fulfillment" and it can be "Yes" this means the clients stayed and check out in the hotel, and "No" this means that the clients canceled the reservation or did not show up.  Based on the visualization of the data. We have selected several variables as predictors. We will use binomial logistic regression.
 
@@ -335,24 +337,18 @@ We build a reduced model without season variable
 
 ```{r }
 # Reduced model without season
-city_m_c2 <- glm(fulfillment ~ deposit_type + is_repeated_guest + previous_cancellations + lead_time  +  total_of_special_requests + child_comp, data = city_hotel, family = "binomial")
+city_m_c2 <- glm(fulfillment ~ deposit_type + is_repeated_guest + previous_cancellations + lead_time +  total_of_special_requests + child_comp, data = city_hotel, family = "binomial")
 summary(city_m_c2)
 
-#AIC: 77660
-# Residual deviance: 77644
-
+# Model fit
 fit_models <- anova(all_city_m_c, city_m_c2, test = "Chisq")
 print(fit_models)
 
 # BIC 
 BIC(all_city_m_c, city_m_c2)
-# Complex model: 77617
-# Reduced model: 77734
 
 # AIC
 AIC(all_city_m_c, city_m_c2)
-# Complex model: 77515
-# Reduced model: 77659
 
 ```
 
@@ -360,7 +356,7 @@ Based on the results of the Chi squared there is a significant difference betwee
 
 Based on the coefficients of the reduced model all the selected predictors: Type of deposit, being a repeated guest, previous cancellations, lead time, special requests and presence of children contributed significantly to the likelihood of fulfillment of the reservation.
 
-###**Null model** 
+### **Null model** 
 
 To asses model fit, we will compare the reduce model against a model without any predictors, and only the intercept
 ```{r }
@@ -373,7 +369,7 @@ summary(city_m_dep)
 AIC: 107788
 Residual deviance: 107786
 
-###**Model fit**
+### **Model fit**
 
 ```{r }
 # Compare models
@@ -440,23 +436,23 @@ tab_model(city_m_c2, show.aic = TRUE, show.loglik = TRUE,
 ```
 * The odds of fulfilling the reservation are increased by 4.39 when the client is a repeated guest than when he is not a repeated guest
 * Per one unit increase in special requests there is a 1.69 increase in the odds of fulfillment.  
-* Odds of fulfillment are smaller by a factor of .18 when the deposit is refundable, .001 when the deposit is not refundable compare to when there is not deposit, 
+* Odds of fulfillment are smaller by a factor of .18 when the deposit is refundable, .001 when the deposit is not refundable compare to when there is not deposit, this last odds ratio does not allow us to properly estimate the effect of non refundable deposit type 
 * Odds of fulfillment are smaller by a factor of .30 when there has being previous cancellations compared to no previous cancellations.
 * In lead time, the value es .99, extremely close to 1, we can interpret it as there is not effect of lead time on fulfillment.
 * Finally, odds of fulfillment are smaller by a factor of .66 when there are children companions compared to no children present.
 
-###**Odds ratio as percentage**
+### **Odds ratio as percentage**
 ```{r}
 odds_perc <- (exp(city_m_c2$coefficients[-1])-1)*100  
 odds_perc
 ```
 
 * The odds of fulfillment of the reservation increased by 69% where there are special requests and by 339% when there have been in the hotel before.
-* The odds of fulfillment  decreased by 99% when there is a non refundable deposit, by 81% when there is a refundable deposit compared to when there is no deposit
+* The odds of fulfillment  decreased by 81% when there is a refundable deposit compared to when there is no deposit
 * The odds of fulfillment decreased by 69% when there have been previous cancellations, by 34% when children are companions
 
 
-###**Assessment the impact of predictors on the probability of an outcome**
+### **Assessment the impact of predictors on the probability of an outcome**
 
 We will use the resort hotel dataset, to test the prediction of the model
 ```{r }
@@ -492,7 +488,7 @@ view(prediction_data)
 
 ```
 
-###**Accuracy and error rate**
+### **Accuracy and error rate**
 
 ```{r }
 # Required packages
@@ -524,15 +520,13 @@ print(error_r)
 # 0. 24 which represents a 24% error rate of prediction
 ```
 
-###**ROC Curve**
+### **ROC Curve**
 
 ```{r }
 # Required packages
 library(pROC)
-library(randomForest)
+library(performance)
 
-# Create ROC curve
-roc(actual_response, predicted_response, plot = TRUE)
 
 # Margin smaller
 par(pty = "s")
@@ -548,13 +542,16 @@ par(pty = "m")
 
 The ROC curve shows that our model has a 71.3% of accuracy for predicting the fulfillment of the hotel reservations
 
-##**Conclusions**
+## **Conclusions**
 
-Based on the analysis we can recommend to both hotels to focus their advertisement on previous guests, as well offering special accommodations, and adjustable packages to serve the needs of the clients. Since being a repeated guest and special request increase the odds of fulfillment of the reservation.
+* Based on the analysis we can recommend to both hotels to focus their advertisement on previous guests, as well offering special accommodations, and adjustable packages to serve the needs of the clients. Since being a repeated guest and special request increase the odds of fulfillment of the reservation. 
+* Hotels can reward client fidelity, when several reservations have been fulfilled, and in this way increasing the chances of clients coming back.
 
-##**Limitations**
 
-The hotel booking has many other informative variables, and they could also be used to build a more accurate model.
+## **Limitations**
+
+* There are some serious limitations in the preset analysis. First, lead time and deposit type did not have a clear contribution to predicting the odds of fulfillment of the reservation
+* The hotel booking has many other informative variables, and they could also be used to build a more accurate model.
 ADR variable, the average daily rate, could have been useful to add to the model, or to define other research questions
 
 
