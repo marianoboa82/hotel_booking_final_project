@@ -1,0 +1,560 @@
+---
+title: "Final project"
+author: "Maria Noboa"
+date: "5/14/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+  number_sections: TRUE
+---
+
+```{r, warning = FALSE, message = FALSE}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(echo = FALSE)
+
+# Required packages
+
+library(car)
+library(performance)
+library(rms)
+library(broom)
+library(tidytuesdayR)
+library(tidyverse)
+library(visdat)
+library(countrycode)
+library(ggsci)
+library(lmtest)
+library(sjPlot)
+
+```
+
+#**Hotel booking dataset** 
+
+The dataset we are going to analyze is "Hotel Booking". This dataset contains hotel booking information from two hotels in Portugal. 
+Research problem: Canceled reservations or no shows are a waste of resources for the hotels. The aim is to predict the fulfillment of the booked reservation in order to provide recommendations to the hotels to have higher changes of fulfillment of the reservation. 
+
+##**Exploratory Data Analysis**
+
+First, we will explore what type of information is available.
+```{r}
+# Import dataset
+booking <- tt_load("2020-02-11")
+
+hotel_booking <- booking$hotels
+
+# Explore the structure of the dataset, type of variables, 
+view(hotel_booking)
+summary(hotel_booking)
+str(hotel_booking)
+
+# Check for missing values
+sum(is.na(hotel_booking))
+vis_miss(hotel_booking, warn_large_data = FALSE)
+
+# Convert the character variables into factors for further manipulation
+
+hotel_book_fac <- hotel_booking %>%
+  mutate_if(is.character,funs(factor(.)))
+   
+# Verify the updated dataset
+view(hotel_book_fac)
+```
+
+###**Data visualization**
+
+Where are the clients from? 
+Clients from which country are more likely to cancel or check out?
+
+```{r }
+# Obtain levels of variable country
+levels(hotel_book_fac$country)
+
+# Country variable has 176 levels, because plotting this variable will be messy, we will plot the top eight countries 
+
+# We visualize the top 8 countries that made reservations on both hotels
+topcountry2 <- hotel_book_fac %>%
+  group_by(hotel) %>%
+  count(country, sort = T) %>%
+  head(11)
+  view(topcountry2)
+
+# Plot
+ggplot(topcountry2, aes(x= country, y = n, fill = hotel)) +
+  geom_col() + 
+  scale_fill_jco() +
+  labs(title = "Top eight countries", x= "Country",
+        y= "Total number of reservations", fill = "Hotel") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+Based on the plot most of the reservations come from Portugal
+To visualize more information we can plot it by continent for this we use the package countrycode that takes the country code and assigns it into a continent in a new variable.
+
+```{r }
+# Assign country to a continent with countrycode function
+
+hotel_book_fac$country_cont <- countrycode(hotel_book_fac$country, origin = "iso3c", destination = "continent")
+
+view(hotel_book_fac)
+
+# We plot the reservation status count by continent in each hotel
+
+ggplot(hotel_book_fac, aes(x = country_cont, fill = reservation_status)) + 
+  geom_bar(position = "dodge") +
+  scale_fill_jco() +
+  facet_wrap(~ hotel) +
+  labs(title = "Reservation status by continent", 
+       x= "Continent", 
+       y= "Number of reservations", 
+       fill = "Reservation status") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+Based on the plot we can see that city hotel has more reservations but also more cancellations, as well most of the clients for both hotels come from Europe
+
+###**Special requests**
+
+We would like to visualize how special requests relate to reservation status in the different hotels
+
+```{r }
+special_requests <- hotel_book_fac %>% 
+  group_by(hotel, reservation_status) %>% 
+  summarize(spec_re_sum =
+              sum(total_of_special_requests)) %>% 
+  arrange(desc(spec_re_sum)) 
+  
+view(special_requests)
+
+# Plot
+ggplot(special_requests, aes(x = reservation_status, y= spec_re_sum, fill = hotel)) +
+  geom_col(position = "dodge") +
+  scale_fill_jco() +
+  labs(title = "Total special requests and its reservation status by continent", 
+       x= "Reservation status", 
+       y= "Total sum of requests", 
+       fill = "Hotel") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+Based on the plot we can visualize that when there are special requests clients are more likely to check out, however a great number of special requests were made and the reservation was still cancelled. Most of the reservations and cancellations are done in City Hotel.
+
+###**Total of check-out clients**
+
+The dataset contains reservations that were cancelled and clients who did not show up. We want to visualize the total number of clients (adult, children and babies) that checkout in each hotel.
+
+```{r }
+hotel_booking2 <- hotel_book_fac %>%
+  group_by(hotel,reservation_status, arrival_date_year) %>%
+  summarize(tot_clients = (sum(adults, children, babies, na.rm = TRUE))) %>%
+  filter(reservation_status == "Check-Out") %>%
+  ggplot(aes(x = arrival_date_year, y = tot_clients, fill = hotel)) +
+  geom_col(position = "dodge") +
+  scale_fill_jco() +
+  #stat_summary(fun.y=mean, geom="point", shape=16, size=4) +
+  labs(title = "Total check-out clients by hotel", 
+       x= "Year of arrival", 
+       y= "Total sum of clients", 
+       fill = "Hotel") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+print(hotel_booking2)
+```
+Based on the graph we can visualize that City hotel had more clients every year than Resort Hotel
+
+###**Reservation status**
+
+We want to visualize how different variables relate to reservations status
+
+```{r }
+# We want to visualize the total sum of reservations and its status made each year in each hotel
+
+hotel_booking3 <- hotel_book_fac %>%
+  group_by(hotel,reservation_status, arrival_date_year) %>%
+  ggplot(aes(x = arrival_date_year, fill = reservation_status)) +
+  geom_bar(position = "dodge") +
+  facet_wrap(~ hotel) +
+  scale_fill_jco() +
+  labs(title = "Total reservations made by hotel", 
+       x= "Year", 
+       y= "Total sum of reservations", 
+       fill = "Reservation status") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+print(hotel_booking3)
+
+# Based on the plot City hotel has more reservations but also more cancellations. 2016 was the year with the highest peak on reservations for both hotels.
+
+# We also want to visualize the reservation status by deposit type
+ggplot(hotel_book_fac, aes(x = deposit_type, fill = reservation_status)) + 
+  geom_bar(position = "dodge") +
+  facet_wrap(~ hotel) +
+  scale_fill_jco() +
+  labs(title = "Reservation status by type of deposit", 
+       x= "Deposit type",
+       y= "Number of reservations", 
+       fill = "Reservation status") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Based on the plot most of the cancellations and no shows occur when there is not deposit in both hotels
+```
+
+##**Further data manipulation**
+
+In the dataset, number of children and infants are separated from adults. We would like to summarize this information in a logical variable that identifies whether the reservation included children/ babies or not. As well, we want to group the month variable by season, since there are months where is expected a lower number of reservations. 
+
+```{r }
+hotel_b_m <- hotel_book_fac %>%
+  mutate(child_comp = ifelse(children + babies > 0, 1, 0)) %>%
+  drop_na(child_comp) %>%
+  mutate(season = 
+           case_when(arrival_date_month %in%
+                       c("March", "April", "May") ~ "Spring",
+                     arrival_date_month %in%
+                       c("June", "July", "August") ~ "Summer",
+                     arrival_date_month %in% 
+                       c("September", "October", "November") ~ "Fall", 
+                     arrival_date_month %in%
+                       c("December", "January", "February") ~ "Winter")) %>%
+  mutate(season = fct_relevel(season, 
+                              levels = "Spring", "Summer", "Fall", "Winter"))
+
+sum(is.na(hotel_b_m2$child_comp))
+
+# Create a more specific variable that indicates whether the reservation was fulfilled or not. 
+
+hotel_b_m2 <- hotel_b_m %>%
+  mutate(fulfillment = ifelse(reservation_status == "Check-Out", 1, 0))
+  
+# Convert variables into factor
+hotel_b_m2$fulfillment <- factor(hotel_b_m2$fulfillment,
+                        levels=c(0,1),labels=c("No","Yes"))
+
+hotel_b_m2$child_comp <- factor(hotel_b_m2$child_comp,
+                                levels =c(0,1),
+                                labels=c("No","Yes"))
+
+hotel_b_m2$is_repeated_guest <-
+  factor(hotel_b_m2$is_repeated_guest,
+         levels =c(0,1), 
+         labels=c("0","1"))
+
+view(hotel_b_m2)
+```
+
+We create some plot to visualize the changes in the new variables
+
+```{r }
+# We plot the reservation status by season
+
+ggplot(hotel_b_m2, aes(x = season, fill = fulfillment)) + 
+  geom_bar(position = "dodge") +
+  facet_wrap(~ hotel) +
+  scale_fill_jco(labels = c("Not fulfilled", "Fulfilled")) +
+  labs(title = "Reservation status by season", 
+       x= "Season",
+       y= "Number of reservations", 
+       fill = "Reservation status") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Based on the graph we visualize that most reservations are done during summer, both fulfilled and not fulfilled, and the lowest month for reservations is winter
+
+ggplot(hotel_b_m2, aes(x = child_comp, fill = fulfillment)) + 
+  geom_bar() + #(position = "dodge") +
+  scale_fill_jco(labels = c("Not fulfilled", "Fulfilled")) +
+  labs(title = "Reservation status and children compaignions", 
+       x= "Presence of children",
+       y= "Number of reservations", 
+       fill = "Reservation status") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Based on the plot most of the presence of children occur during summer
+
+# We want to visualize the reservation status by lead time
+ggplot(hotel_b_m2, aes(x = hotel, y = lead_time, fill = factor(fulfillment))) + 
+  geom_boxplot(position = "dodge") +
+  scale_fill_jco(labels = c("Not fulfilled", "Fulfilled")) +
+  labs(title = "Reservation status by amount of days after booking", 
+       x= "Hotel",
+       y= "Lead time in days", 
+       fill = "Reservation status") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Based on the plot the more days there are in between the booking and the arrival of the clients, they are more likely to not fulfill the reservation
+```
+
+After the EDA we select the variables that might be good predictors of the likelihood of fulfillment of reservation
+
+```{r }
+# Select variables
+hotel_m <- hotel_b_m2 %>%
+  select(hotel,lead_time, is_repeated_guest, previous_cancellations, deposit_type, total_of_special_requests, child_comp, season, fulfillment)
+
+head(hotel_m)
+
+# Create two separate datasets for each hotel 
+
+# City Hotel dataset
+city_hotel <- hotel_m %>%
+    filter(hotel == "City Hotel")
+
+# Check for missing values
+sum(is.na(city_hotel))
+view(city_hotel)
+
+# Resort Hotel dataset
+resort_hotel <- hotel_m %>%
+  filter(hotel == "Resort Hotel")
+
+# Check for missing values
+sum(is.na(resort_hotel))
+view(resort_hotel)
+
+```
+
+##**Building the model**
+
+We want to predict the fulfillment or not fulfillment of the reservations. The outcome is binomial categorical variable "Fulfillment" and it can be "Yes" this means the clients stayed and check out in the hotel, and "No" this means that the clients canceled the reservation or did not show up.  Based on the visualization of the data. We have selected several variables as predictors. We will use binomial logistic regression.
+
+First we build a model with all predictor variables selected in the dataset.
+
+```{r }
+# Complex model with all selected variables
+all_city_m_c <- glm(fulfillment ~ lead_time + is_repeated_guest + previous_cancellations + deposit_type  +  + total_of_special_requests + child_comp + season, data = city_hotel, family = "binomial")
+summary(all_city_m_c)
+
+# Check Multicollinearity
+car::vif(all_city_m_c)
+
+# All predictors with values lower than 3
+```
+
+Based on the results, we identified that all predictors are significant. However, not all levels of season are significant, winter is not signficant. We consider that including season might not be adequate as we know that summer tends to be a higher season and winter a lower one, fulfillment is more likely to occur during summer.
+
+We build a reduced model without season variable
+
+```{r }
+# Reduced model without season
+city_m_c2 <- glm(fulfillment ~ deposit_type + is_repeated_guest + previous_cancellations + lead_time  +  total_of_special_requests + child_comp, data = city_hotel, family = "binomial")
+summary(city_m_c2)
+
+#AIC: 77660
+# Residual deviance: 77644
+
+fit_models <- anova(all_city_m_c, city_m_c2, test = "Chisq")
+print(fit_models)
+
+# BIC 
+BIC(all_city_m_c, city_m_c2)
+# Complex model: 77617
+# Reduced model: 77734
+
+# AIC
+AIC(all_city_m_c, city_m_c2)
+# Complex model: 77515
+# Reduced model: 77659
+
+```
+
+Based on the results of the Chi squared there is a significant difference between these two models. We will keep the reduced model due to being more parsimonious. And we will compare the performance of the reduced model against a null model with only the intercept.
+
+Based on the coefficients of the reduced model all the selected predictors: Type of deposit, being a repeated guest, previous cancellations, lead time, special requests and presence of children contributed significantly to the likelihood of fulfillment of the reservation.
+
+###**Null model** 
+
+To asses model fit, we will compare the reduce model against a model without any predictors, and only the intercept
+```{r }
+# Create a null model, with only the intercept
+city_m_dep <- glm(fulfillment ~ 1, data = city_hotel, family = "binomial")
+summary(city_m_dep)
+
+```
+
+AIC: 107788
+Residual deviance: 107786
+
+###**Model fit**
+
+```{r }
+# Compare models
+fit_models <- anova(city_m_dep, city_m_c2, test = "Chisq")
+print(fit_models)
+
+# When comparing the models, reduced complex model represent a significant improvement compared to the null model
+
+BIC(city_m_dep, city_m_c2)
+# BIC values for null model 107797
+# BIC values for complex model 77734
+
+AIC(city_m_dep, city_m_c2)
+# AIC values for simple model 107787
+# AIC values for complex model 77659
+
+# Likelihood radio test
+fit3 <- lrtest(city_m_dep, city_m_c2)
+print(fit3)
+
+# Chi squared 30142 p. <0.000
+#VIF
+car::vif(city_m_c2)
+
+# There is no multicollinearity, all variables have values below 3
+
+# Table of deviance
+anova(city_m_c2, test="Chisq")
+```
+Based on the model comparison, the reduced model is the better fit against a null model. We will continue assessing the fitness of the logistic regression model. First we need to interpret the coefficients of the selected model.
+
+```{r }
+#Required package
+library(coefplot)
+
+# Check regression coefficients on the selected model
+summary(city_m_c2)
+
+# Plotting the coefficients
+coefplot(city_m_c2, innerCI=2, outerCI=0, 
+         ylab= "Predictors",
+         intercept = FALSE, decreasing = TRUE)
+
+# Because in logistic regression they are difficult to interpret, we exponentiate them
+exp(coef(city_m_c2))
+
+# 95% Confidence intervals for the coefficients
+exp(confint(city_m_c2))
+
+# Table according to APA format
+tab_model(city_m_c2, show.aic = TRUE, show.loglik = TRUE, 
+          string.ci = "95% CI", 
+          show.stat = TRUE, robust = TRUE,
+          dv.labels = "Fulfillment of reservations in City Hotel",
+          pred.labels = c("(Intercept)",
+                          "Non-refundable deposit", 
+                          "Refundable deposit", 
+                          "Repeated guest",
+                          "Previous cancellations",
+                          "Lead time",
+                          "Special requests",
+                          "Children compaignions"))
+
+```
+* The odds of fulfilling the reservation are increased by 4.39 when the client is a repeated guest than when he is not a repeated guest
+* Per one unit increase in special requests there is a 1.69 increase in the odds of fulfillment.  
+* Odds of fulfillment are smaller by a factor of .18 when the deposit is refundable, .001 when the deposit is not refundable compare to when there is not deposit, 
+* Odds of fulfillment are smaller by a factor of .30 when there has being previous cancellations compared to no previous cancellations.
+* In lead time, the value es .99, extremely close to 1, we can interpret it as there is not effect of lead time on fulfillment.
+* Finally, odds of fulfillment are smaller by a factor of .66 when there are children companions compared to no children present.
+
+###**Odds ratio as percentage**
+```{r}
+odds_perc <- (exp(city_m_c2$coefficients[-1])-1)*100  
+odds_perc
+```
+
+* The odds of fulfillment of the reservation increased by 69% where there are special requests and by 339% when there have been in the hotel before.
+* The odds of fulfillment  decreased by 99% when there is a non refundable deposit, by 81% when there is a refundable deposit compared to when there is no deposit
+* The odds of fulfillment decreased by 69% when there have been previous cancellations, by 34% when children are companions
+
+
+###**Assessment the impact of predictors on the probability of an outcome**
+
+We will use the resort hotel dataset, to test the prediction of the model
+```{r }
+# Take the resort hotel dataset as a prediction set
+
+testdata <- resort_hotel %>%
+  select(deposit_type, is_repeated_guest, previous_cancellations, lead_time, total_of_special_requests, child_comp)
+
+view(testdata)
+
+# Use testdata and prediction equation to obtain probabilities
+testdata$prob <- predict(city_m_c2, newdata=testdata, type="response")
+view(testdata)
+
+# Test overdispersion
+deviance(city_m_c2)/df.residual(city_m_c2)
+# Overdispersion is not larger than 1, which means we do not have overdispersion.
+
+```
+
+We want to obtain the most likely outcome, odds ratio and the logs odd ratio
+
+```{r }
+prediction_data <- testdata %>%
+mutate(
+has_fulfill = predict(city_m_c2, testdata, type = "response"),
+most_likely_response = round(has_fulfill),
+odds_ratio = has_fulfill / (1 - has_fulfill), log_odds_ratio = log(odds_ratio),
+log_odds_ratio2 = predict(city_m_c2, testdata))
+
+view(prediction_data)
+
+
+```
+
+###**Accuracy and error rate**
+
+```{r }
+# Required packages
+library(yardstick)
+library(gmodels)
+
+# Create objects with the fulfillment variable from the original dataset and the predicted outcome from the model 
+actual_response <- city_hotel$fulfillment
+predicted_response <- round(fitted(city_m_c2))
+
+# Create the confusion matrix with the CrossTable function from the gmodels package 
+confusion_m <- CrossTable(actual_response, predicted_response)
+
+confusion_m
+
+# Acurracy
+accuracy <- (14833 + 45237) / (14833 + 991 + 18265 + 45237)
+
+print(accuracy)
+
+# 0.76 which represents 76% of acurracy of prediction
+
+# Error rate
+
+error_r = (991 + 18265) / (14833 + 991 + 18265 + 45237)
+
+print(error_r)
+
+# 0. 24 which represents a 24% error rate of prediction
+```
+
+###**ROC Curve**
+
+```{r }
+# Required packages
+library(pROC)
+library(randomForest)
+
+# Create ROC curve
+roc(actual_response, predicted_response, plot = TRUE)
+
+# Margin smaller
+par(pty = "s")
+# ROC curve
+roc(actual_response, predicted_response, plot = TRUE, legacy.axes = TRUE)
+
+# ROC curve with percentage and AUC
+roc(actual_response, predicted_response, plot = TRUE, legacy.axes = TRUE, percent = TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="blue", lwd=3, print.auc = TRUE)
+# Resetting margins
+par(pty = "m")
+
+```
+
+The ROC curve shows that our model has a 71.3% of accuracy for predicting the fulfillment of the hotel reservations
+
+##**Conclusions**
+
+Based on the analysis we can recommend to both hotels to focus their advertisement on previous guests, as well offering special accommodations, and adjustable packages to serve the needs of the clients. Since being a repeated guest and special request increase the odds of fulfillment of the reservation.
+
+##**Recommendations**
+
+The hotel booking has many other interesting variables, and they could also be consider to build another model
+
+
+
