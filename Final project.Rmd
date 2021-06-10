@@ -103,7 +103,7 @@ view(hotel_book_fac)
 # We plot the reservation status count by continent in each hotel
 
 ggplot(hotel_book_fac, aes(x = country_cont, fill = reservation_status)) + 
-  geom_bar(position = "dodge") +
+  geom_bar() +
   scale_fill_jco() +
   facet_wrap(~ hotel) +
   labs(title = "Reservation status by continent", 
@@ -153,7 +153,6 @@ hotel_booking2 <- hotel_book_fac %>%
   ggplot(aes(x = arrival_date_year, y = tot_clients, fill = hotel)) +
   geom_col(position = "dodge") +
   scale_fill_jco() +
-  #stat_summary(fun.y=mean, geom="point", shape=16, size=4) +
   labs(title = "Total check-out clients by hotel", 
        x= "Year of arrival", 
        y= "Total sum of clients", 
@@ -257,7 +256,8 @@ ggplot(hotel_b_m2, aes(x = season, fill = fulfillment)) +
        x= "Season",
        y= "Number of reservations", 
        fill = "Reservation status") +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5)) +
+  coord_flip()
 
 # Based on the graph we visualize that most reservations are done during summer, both fulfilled and not fulfilled, and the lowest month for reservations is winter
 
@@ -549,7 +549,7 @@ The ROC curve shows that our model has a 71.3% of accuracy for predicting the fu
 
 ## **Limitations**
 
-* There are some serious limitations in the present analysis. First, lead time and deposit type did not have a clear contribution to predicting the odds of fulfillment of the reservation. Further data manipulation with these variables could have been useful.
+* There are limitations in the present analysis. First, lead time and deposit type did not have a clear contribution to predicting the odds of fulfillment of the reservation. Further data manipulation with these variables could have been useful.
 * The hotel booking has many other informative variables, and they could also be used to build a more accurate model.
 ADR variable, the average daily rate, could have been useful to add to the model, or to define other interesting research questions.
 
